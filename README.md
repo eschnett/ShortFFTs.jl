@@ -1,6 +1,6 @@
 # ShortFFTs.jl
 
-Efficient and inlineable Fast Fourier Transforms for small sizes
+Efficient and inlineable short Fast Fourier Transforms
 
 * [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://eschnett.github.io/ShortFFTs.jl/dev/)
 * [![GitHub
