@@ -2,7 +2,7 @@
 
 Efficient and inlineable Fast Fourier Transforms for small sizes
 
-* [Documentation](https://eschnett.github.io/ShortFFTs.jl/dev/)
+* [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://eschnett.github.io/ShortFFTs.jl/dev/)
 * [![GitHub
   CI](https://github.com/eschnett/ShortFFTs.jl/workflows/CI/badge.svg)](https://github.com/eschnett/ShortFFTs.jl/actions)
 * [![codecov](https://codecov.io/gh/eschnett/ShortFFTs.jl/branch/main/graph/badge.svg?token=75FT03ULHD)](https://codecov.io/gh/eschnett/ShortFFTs.jl)
