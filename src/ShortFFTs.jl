@@ -9,19 +9,23 @@ export short_fft
 # Unzip a vector of tuples
 unzip(xs::AbstractVector{<:Tuple}) = ([x[1] for x in xs], [x[2] for x in xs])
 
-# Calculate phase
-function phase1(::Type{T}, k::Rational) where {T<:Complex}
+# Find a common type for a tuple
+promote_tuple(X::Tuple) = promote_type((typeof(x) for x in X)...)
+
+cw(x) = Complex(imag(x), -real(x)) # -im * x
+
+# Apply a phase to an expression
+function phase(::Type{T}, k::Rational, expr) where {T<:Complex}
     k = mod(k, 1)
-    k == 0 && return T(1)
-    k >= 1//2 && return -phase1(T, k - 1//2)
-    k >= 1//4 && return -im * phase1(T, k - 1//4)
-    k == 1//8 && return (1 - im) * sqrt(T(1//2))
-    # k > 1//8 && return (1 - im) * sqrt(T(1//2)) * phase1(T, k - 1//8)
-    return cispi(-2 * T(k))
+    # Ensure that simple cases do not lead to arithmetic operations
+    k == 0 && return expr
+    k >= 1//2 && return phase(T, k - 1//2, :(-$expr))
+    k >= 1//4 && return phase(T, k - 1//4, :(cw($expr)))
+    k == 1//8 && return :($((1 - im) * sqrt(T(1//2))) * $expr)
+    # Prevent round-off by evaluating the phase constants with very high precision
+    return :($(T(cispi(BigFloat(-2 * k)))) * $expr)
 end
-phase(::Type{T}, k::Rational) where {T<:Complex} = T(phase1(Complex{BigFloat}, k))
-phase(::Type{T}, k::Integer) where {T<:Complex} = phase(T, Rational(k))
-@assert all(phase(Complex{Float64}, i//N) ≈ cispi(-2 * i / N) for N in 1:17 for i in 0:(2 * N))
+phase(::Type{T}, k::Integer, expr) where {T<:Complex} = phase(T, Rational(k), expr)
 
 # Generate a short FFT
 function gen_fft(::Type{T}, X::AbstractVector) where {T<:Complex}
@@ -47,7 +51,8 @@ function gen_fft(::Type{T}, X::AbstractVector) where {T<:Complex}
     # Handle prime lengths directly
     if isprime(N)
         Y = [gensym(Symbol(:Y, n - 1)) for n in 1:N]
-        term(i, n) = :($(phase(T, ((i - 1) * (n - 1))//N)) * $(X[i]))
+        # term(i, n) = :($(phase(T, ((i - 1) * (n - 1))//N)) * $(X[i]))
+        term(i, n) = phase(T, ((i - 1) * (n - 1))//N, X[i])
         stmts = [
             quote
                 $(Y[n]) = +($([term(i, n) for i in 1:N]...))
@@ -68,9 +73,10 @@ function gen_fft(::Type{T}, X::AbstractVector) where {T<:Complex}
     # First step: N1 FFTs of size N2
     codeYs, Ys = unzip([gen_fft(T, [X[i] for i in n1:N1:N]) for n1 in 1:N1])
     # twiddle factors
-    twiddle(n1, n2) = phase(T, ((n1 - 1) * (n2 - 1))//(N1 * N2))
+    # twiddle(n1, n2) = phase(T, ((n1 - 1) * (n2 - 1))//(N1 * N2))
+    twiddle(n1, n2, expr) = phase(T, ((n1 - 1) * (n2 - 1))//(N1 * N2), expr)
     # Second step: N2 FFTs of size N1
-    codeZs, Zs = unzip([gen_fft(T, [:($(twiddle(n1, n2)) * $(Ys[n1][n2])) for n1 in 1:N1]) for n2 in 1:N2])
+    codeZs, Zs = unzip([gen_fft(T, [twiddle(n1, n2, Ys[n1][n2]) for n1 in 1:N1]) for n2 in 1:N2])
     # Combine results
     code = quote
         $(codeYs...)
@@ -85,17 +91,19 @@ end
     code, res = gen_fft(T, [:(X[$n]) for n in 1:N])
     return quote
         Base.@_inline_meta
-        @fastmath begin
+        begin
             $code
         end
-        return tuple($(res...))::NTuple{$N,$T}
+        return tuple($(res...))
     end
 end
 
-short_fft(X::NTuple{N,T}) where {N,T<:Complex} = short_fft(T, X)
+@inline short_fft(X::Tuple) = short_fft(complex(promote_tuple(X)), X)
+
+@inline short_fft(X::NTuple{N,T}) where {N,T<:Complex} = short_fft(T, X)
 short_fft(X::AbstractVector{T}) where {T<:Complex} = short_fft(T, Tuple(X))
 
-short_fft(X::NTuple{N,T}) where {N,T<:Real} = short_fft(complex(T), X)
+@inline short_fft(X::NTuple{N,T}) where {N,T<:Real} = short_fft(complex(T), X)
 short_fft(X::AbstractVector{T}) where {T<:Real} = short_fft(complex(T), Tuple(X))
 
 end
