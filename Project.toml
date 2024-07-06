@@ -1,7 +1,7 @@
 name = "ShortFFTs"
 uuid = "3a4051df-11c6-4922-af5a-d7072afac5a2"
 authors = ["Erik Schnetter <schnetter@gmail.com>"]
-version = "1.1.0"
+version = "1.0.0"
 
 [deps]
 Primes = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
