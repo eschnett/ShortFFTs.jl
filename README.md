@@ -76,9 +76,11 @@ This example first expands its input from 4 to 8 points by setting the
 additional points to zero and then applies an FFT.
 
 ```julia
+using ShortFFTs
+
 input = randn(Complex{Float32}, (32, 4))
 
-# Use ShortFFTw: We can write an efficient loop kernel
+# We can use ShortFFT inside an efficient loop kernel
 output = Array{Complex{Float32}}(undef, (32, 8))
 for i in 1:32
     X = (input[i, 1], input[i, 2], input[i, 3], input[i, 4], 0, 0, 0, 0)
@@ -87,4 +89,23 @@ for i in 1:32
         output[i, j] = Y[j]
     end
 end
+```
+
+We can also call `short_fft` from CUDA (or other accelerator) code:
+```julia
+using CUDA
+using ShortFFTs
+
+@inbounds function fft2!(output::CuDeviceArray{T,2}, input::CuDeviceArray{T,2}) where {T}
+    i = threadIdx().x
+    X = (input[i, 1], input[i, 2], input[i, 3], input[i, 4], 0.0f0, 0.0f0, 0.0f0, 0.0f0)
+    Y = short_fft(X)
+    for j in 1:8
+        output[i, j] = Y[j]
+    end
+end
+
+input = CUDA.randn(Complex{Float32}, (32, 4))
+output = similar(input, (32, 8))
+@cuda threads=32 blocks=1 fft2!(output, input)
 ```
